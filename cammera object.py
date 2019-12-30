@@ -5,7 +5,7 @@ import cv2
 import threading
 from tensorflow.lite.python.interpreter import Interpreter
 from PIL import Image
-
+from playsound import playsound                                                           #for sound try see if can detect os for how sounds played by playsound or raspberry pi buzzer. same for tensorflow.
 
 
 
@@ -49,6 +49,17 @@ class realsenseBackbone():
         #return depth frames
         depthFrame = frame.get_depth_frame()
         return depthFrame
+    def getAlignedFrame(self, frame):
+        """
+        Align the depth frame to the color frame
+        @return returns a aligned depth and color frame
+        """
+        #align_to is the stream type the frames are aligned with.
+        align_to = rs.stream.color
+        #rs.align is function used to align the frames.
+        align = rs.align(align_to)
+        aligned_frames = align.process(frames)
+        return aligned_frames
 
     def getColorFrame(self, frame):
         # inputS the frame thats collected and returns color frame part.
@@ -63,7 +74,7 @@ class realsenseBackbone():
 
     def depthImageCV2(self, depthFrame):                                                                #think about usign opencv colorizer might make it more clear
         #inputs the depth frame
-        #then apply color mappuing to the image into a numpyarray to be displayed in cv2
+        #then apply color mapping to the image into a numpyarray to be displayed in cv2
         colorized = rs.colorizer(3) #can change vaule for color map
         colorized_depth = np.asanyarray(colorized.colorize(depthFrame).get_data())
         return colorized_depth
@@ -271,9 +282,13 @@ if __name__ == "__main__":
                                                                #may need to deal with if model is floating
 
     while (True):
+        #playsound('Buzzer.mp3')
         #retrives the respective frames required and sends them where needed.
         start = timer()
+        #retives the frames for the enabled streams from the camera and, aligns depth and color frame.
         frames = backbone.getFrames() #get the frame from the camera
+        frames = backbone.getAlignedFrame(frames)
+
         timeStamp = frames.get_timestamp() / 1000
         #retrives the depth image from camera
         depth_frame = backbone.getDepthFrame(frames)
@@ -303,9 +318,9 @@ if __name__ == "__main__":
         count = int(interpreter.get_tensor(outputDetails[3]["index"])[0]) # Number of objects detected 
 
         """Retrieve the bounding box and scale it to the original image
-        draw the boundiung box onto the image adn apply the label above the object
+        draw the boundiung box onto the image and apply the label above the object
         """
-        for i in range(count):
+        for i in range(count):                                                                                                                      #check if count is correct.
             if(score[i] >= threshold):
                 ymin = int(boxes[i][0] * origH)
                 xmin = int(boxes[i][1] * origW)
