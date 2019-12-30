@@ -84,7 +84,7 @@ class realsenseBackbone():
     distance and 3d point realtive to the cammera functions
     """
 
-    def distancePixel(self,depthFrame, x, y):
+    def distancePixel(self, depthFrame, x, y):
         """
         #takes in a depth frame form the camera and cordinates of the pixel 
         #from where the depth is wanted.
@@ -217,7 +217,7 @@ class realsenseBackbone():
         #depthFrame = self.threshold(depthFrame, minDist, maxDist)
         depthFrame = self.disparity(depthFrame)
         depthFrame = self.spatial(depthFrame)
-        depthFrame = self.hole(depthFrame)
+        #depthFrame = self.hole(depthFrame)
         #depthFrame = self.decimation(depthFrame)
 
         return depthFrame
@@ -253,8 +253,32 @@ def loadLabels(labelfile):
     return labels
 
 #mayb make it a fucntion
-#def detect()
 
+def object_distance(frame, min, max, realsensebackbone, default_distance = 0.5):
+    #sends in the pixel coordinates of a object and the depth frame. Using the depth feed checks to see if a object
+    #is to close to the cammera by traversing the point and retrieveing the disatnce form the cammera.
+    xcoord = min[0]
+    ycoord = min[1]
+    xmax = max[0]
+    ymax = max[1]
+
+    xincrement = int((xmax - xcoord) / 20)
+    yincrement = int((ymax - ycoord) / 20)
+    object_warn = False
+    #traverse the x cordiantes
+    while (xcoord < xmax and object_warn != True):
+        ycoord = min[1]
+        #traverse the y coordinatess
+        while (ycoord < ymax):
+            dist = realsensebackbone.distancePixel(frame, xcoord, ycoord)
+            #if the object detectedd is to close warn the user.
+            if (dist < default_distance and dist != 0):
+                object_warn = True
+            ycoord = ycoord + yincrement
+        xcoord = xcoord + xincrement
+    if (object_warn):
+        print('Found')
+        #playsound('Buzzer.mp3')
 
 
 
@@ -292,6 +316,7 @@ if __name__ == "__main__":
         timeStamp = frames.get_timestamp() / 1000
         #retrives the depth image from camera
         depth_frame = backbone.getDepthFrame(frames)
+
         # retrives color image as a np array
         color_image = backbone.colorImageCV2(frames)
         origH = color_image.shape[0]
@@ -309,7 +334,7 @@ if __name__ == "__main__":
         interpreter.invoke()
 
         #threshold correlating to the probability the calss was detected
-        threshold = .60
+        threshold = .40
 
         #retrieve the model output first index correlates to output array
         boxes = interpreter.get_tensor(outputDetails[0]['index'])[0] # Bounding box cordinates                                                                #understand get tensor
@@ -322,11 +347,12 @@ if __name__ == "__main__":
         """
         for i in range(count):                                                                                                                      #check if count is correct.
             if(score[i] >= threshold):
-                ymin = int(boxes[i][0] * origH)
-                xmin = int(boxes[i][1] * origW)
-                ymax = int(boxes[i][2] * origH)
-                xmax = int(boxes[i][3] * origW)
-                
+                #retive the bounding box coordinates. Must make sure that the coordinates are not ouside the image 
+                ymin = int(max(1,(boxes[i][0] * origH)))
+                xmin = int(max(1, (boxes[i][1] * origW)))
+                ymax = int(min(origH, (boxes[i][2] * origH)))
+                xmax = int(min(origW, (boxes[i][3] * origW)))
+                object_distance(depth_frame, (xmin,ymin), (xmax,ymax), backbone)
                 #print(ymin, xmin, ymax, xmax)
                 #draws the boundiung box
                 cv2.rectangle(color_image, (xmin,ymin), (xmax,ymax), (10,255,0), 4, cv2.LINE_4)
