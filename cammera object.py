@@ -252,7 +252,6 @@ def loadLabels(labelfile):
             labels.append(line)
     return labels
 
-#mayb make it a fucntion
 
 def object_distance(frame, min, max, realsensebackbone, default_distance = 0.5):
     #sends in the pixel coordinates of a object and the depth frame. Using the depth feed checks to see if a object
@@ -262,14 +261,14 @@ def object_distance(frame, min, max, realsensebackbone, default_distance = 0.5):
     xmax = max[0]
     ymax = max[1]
 
-    xincrement = int((xmax - xcoord) / 20)
-    yincrement = int((ymax - ycoord) / 20)
+    xincrement = int((xmax - xcoord) / 5) #based on what you divided by will give you the number of points looked at.
+    yincrement = int((ymax - ycoord) / 5)
     object_warn = False
-    #traverse the x cordiantes
+    #traverse the x cordiantes stops if reaches end of object or object is detected.
     while (xcoord < xmax and object_warn != True):
         ycoord = min[1]
         #traverse the y coordinatess
-        while (ycoord < ymax):
+        while (ycoord < ymax and object_warn != True):
             dist = realsensebackbone.distancePixel(frame, xcoord, ycoord)
             #if the object detectedd is to close warn the user.
             if (dist < default_distance and dist != 0):
@@ -277,8 +276,7 @@ def object_distance(frame, min, max, realsensebackbone, default_distance = 0.5):
             ycoord = ycoord + yincrement
         xcoord = xcoord + xincrement
     if (object_warn):
-        print('Found')
-        #playsound('Buzzer.mp3')
+        playsound('Buzzer.mp3', False)
 
 
 
