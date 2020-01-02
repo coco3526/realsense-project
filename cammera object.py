@@ -164,7 +164,6 @@ class realsenseBackbone():
         return outf
 
 
-
     """
     Filters settings.
     must call depthimageCv2 to display any filters
@@ -278,6 +277,27 @@ def object_distance(frame, min, max, realsensebackbone, default_distance = 0.5):
     if (object_warn):
         playsound('Buzzer.mp3', False)
 
+def resize_image(color_image, width, height):
+    """Resizeing of the image
+
+    Resizes the image that will be porcessed to the size of the model used.
+    Also adjustes the dimmension of the image to match as well.
+
+    Param:
+    color_image is the image that will be resized.
+    Width and height is the width of the model trained.
+
+    returns a resized image.
+    """
+    #make the image shape be [1 x height x width x 3] 
+    color_RGB = cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB) #convert the color to rgb
+    color_resize =cv2.resize(color_RGB, (width, height))
+    image_data = np.expand_dims(color_resize, axis=0) #expand the diminstion to 4 making first one 1 item
+    return image_data
+        
+#def object_detection_vis():
+
+
 
 
 backbone = realsenseBackbone()
@@ -320,12 +340,7 @@ if __name__ == "__main__":
         origH = color_image.shape[0]
         origW = color_image.shape[1]
 
-        #reize color image to be same as model 
-        #make the image shape be [1 x height x width x 3] 
-        #3 correlates to rgb format. 
-        color_RGB = cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB) #convert the color to rgb
-        color_resize =cv2.resize(color_RGB, (width, height))
-        image_data = np.expand_dims(color_resize, axis=0) #expand the diminstion to 4 making first one 1 item
+        image_data = resize_image(color_image, width, height)
         
         #perform detection on the resized image
         interpreter.set_tensor(inputDetails[0]['index'], image_data)
@@ -342,6 +357,10 @@ if __name__ == "__main__":
 
         """Retrieve the bounding box and scale it to the original image
         draw the boundiung box onto the image and apply the label above the object
+        ****************************************
+        To optimize for use on full implementation only check till an object is found to be to close  set bool true inform user.
+        Give a delay to allow user to adjust before warning the user of any other objects
+        *****************************************
         """
         for i in range(count):                                                                                                                      #check if count is correct.
             if(score[i] >= threshold):
@@ -355,11 +374,12 @@ if __name__ == "__main__":
                 #draws the boundiung box
                 cv2.rectangle(color_image, (xmin,ymin), (xmax,ymax), (10,255,0), 4, cv2.LINE_4)
 
-                #apply the label to each object
+                #apply the label to each object. check make sure its a valid label.
                 #print(classes[i])
                 if(int(classes[i]) < len(label)):
                     object_name = label[int(classes[i])] # Look up the object in the label array from the class index
                     label_name =  '%s: %d%%' % (object_name, int(score[i]*100))
+
                     #labelSize, baseLine = cv2.getTextSize(label_name, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2) # Get font size
                     #label_ymin = max(ymin, labelSize[1] + 10) # Make sure not to draw label too close to top of window
 
