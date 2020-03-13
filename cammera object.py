@@ -309,7 +309,7 @@ labelFile = "labelmap.txt"
 
 if __name__ == "__main__":
     #load the model and allocate tensor
-    interpreter  = Interpreter("detect.tflite")
+    interpreter  = Interpreter(modelfile)
     interpreter.allocate_tensors()
     #load labels of the model
     label = loadLabels(labelFile)
@@ -375,7 +375,7 @@ if __name__ == "__main__":
                 cv2.rectangle(color_image, (xmin,ymin), (xmax,ymax), (10,255,0), 4, cv2.LINE_4)
 
                 #apply the label to each object. check make sure its a valid label.
-                #print(classes[i])
+                print(classes[i])
                 if(int(classes[i]) < len(label)):
                     object_name = label[int(classes[i])] # Look up the object in the label array from the class index
                     label_name =  '%s: %d%%' % (object_name, int(score[i]*100))
