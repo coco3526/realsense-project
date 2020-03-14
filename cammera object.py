@@ -1,6 +1,7 @@
 import pyrealsense2 as rs               #removed inputs
 import numpy as np
 from time import clock as timer
+import time
 import cv2
 import threading
 from tensorflow.lite.python.interpreter import Interpreter
@@ -91,7 +92,6 @@ class realsenseBackbone():
         @param depthFrame isa depth frame form the cammera without any filters applied.
         @param x is the x coridinate of the pixel
         @param y is the y cordinate of the pixel
-        @param deproject retrun the depth in meters
         @retrun returns distance in meters
         """
         distance = depthFrame.get_distance(x, y)
@@ -251,6 +251,23 @@ def loadLabels(labelfile):
             labels.append(line)
     return labels
 
+def resize_image(color_image, width, height):
+    """Resizeing of the image
+
+    Resizes the image that will be porcessed to the size of the model used.
+    Also adjustes the dimmension of the image to match as well.
+
+    Parameteres:
+    color_image is the image that will be resized.
+    Width and height is the width of the model trained.
+
+    returns a resized image.
+    """
+    #make the image shape be [1 x height x width x 3] 
+    color_RGB = cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB) #convert the color to rgb
+    color_resize =cv2.resize(color_RGB, (width, height))
+    image_data = np.expand_dims(color_resize, axis=0) #expand the diminstion to 4 making first one 1 item
+    return image_data
 
 def object_distance(frame, min, max, realsensebackbone, default_distance = 0.5):
     #sends in the pixel coordinates of a object and the depth frame. Using the depth feed checks to see if a object
@@ -263,7 +280,7 @@ def object_distance(frame, min, max, realsensebackbone, default_distance = 0.5):
     xincrement = int((xmax - xcoord) / 5) #based on what you divided by will give you the number of points looked at.
     yincrement = int((ymax - ycoord) / 5)
     object_warn = False
-    #traverse the x cordiantes stops if reaches end of object or object is detected.
+    #traverse the x cordiantes stops if reaches end of object bounding box or object is detected.
     while (xcoord < xmax and object_warn != True):
         ycoord = min[1]
         #traverse the y coordinatess
@@ -274,45 +291,44 @@ def object_distance(frame, min, max, realsensebackbone, default_distance = 0.5):
                 object_warn = True
             ycoord = ycoord + yincrement
         xcoord = xcoord + xincrement
-    if (object_warn):
-        playsound('Buzzer.mp3', False)
 
-def resize_image(color_image, width, height):
-    """Resizeing of the image
+    return object_warn
 
-    Resizes the image that will be porcessed to the size of the model used.
-    Also adjustes the dimmension of the image to match as well.
 
-    Param:
-    color_image is the image that will be resized.
-    Width and height is the width of the model trained.
-
-    returns a resized image.
+def object_detect(frame, min, max, object_name, realsense_backbone, default_distance = 0.5):                                                                        #maybe make a text file that corelates to immediate concern object that read in also look into warning about diffrent object by sound
     """
-    #make the image shape be [1 x height x width x 3] 
-    color_RGB = cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB) #convert the color to rgb
-    color_resize =cv2.resize(color_RGB, (width, height))
-    image_data = np.expand_dims(color_resize, axis=0) #expand the diminstion to 4 making first one 1 item
-    return image_data
-        
-#def object_detection_vis():
+    Main function for detection that checks for any object thats labeld as a imediate concern class either not being able to be detected by depth or, object 
+    to far away or slanted down aand not able to be picked up by depth cammera ex stairs down. It also calls object_distance to check the distacne the object is.
+    """
+    warn = False
 
+    #checks for any class thats an immediate concern.
+    if(object_name == 'Stairs_down'):
+        warn = True
+    else:
+        warn = object_distance(frame, min, max, realsense_backbone, default_distance)
 
+    if (warn):
+        playsound('Buzzer.mp3', False)
+        time.sleep(2)                                                                                                                                                  #look into how to have it wait to warn about about 
+        return True
 
-
-backbone = realsenseBackbone()
-pipeline = backbone.getpipeline()
-modelfile = "detect.tflite"
-labelFile = "labelmap.txt"
-
-
+    return False
 
 if __name__ == "__main__":
+    #initalize items
+    backbone = realsenseBackbone()
+    pipeline = backbone.getpipeline()
+    modelfile = "detect.tflite"
+    labelFile = "labelmap.txt"
+
     #load the model and allocate tensor
-    interpreter  = Interpreter(modelfile)
+    interpreter = Interpreter(modelfile)
     interpreter.allocate_tensors()
     #load labels of the model
     label = loadLabels(labelFile)
+    labelLength = len(label)
+
     #retrives the models input and output details
     inputDetails = interpreter.get_input_details()
     outputDetails = interpreter.get_output_details()
@@ -321,12 +337,13 @@ if __name__ == "__main__":
     height = inputDetails[0]['shape'][1]
     width = inputDetails[0]['shape'][2]
 
-                                                               #may need to deal with if model is floating
+    #threshold correlating to the probability the calss was detected
+    threshold = .40
 
     while (True):
-        #playsound('Buzzer.mp3')
         #retrives the respective frames required and sends them where needed.
-        start = timer()
+        start = timer()# creates a time that represent time elapsed since the first call to clock()
+        
         #retives the frames for the enabled streams from the camera and, aligns depth and color frame.
         frames = backbone.getFrames() #get the frame from the camera
         frames = backbone.getAlignedFrame(frames)
@@ -346,8 +363,7 @@ if __name__ == "__main__":
         interpreter.set_tensor(inputDetails[0]['index'], image_data)
         interpreter.invoke()
 
-        #threshold correlating to the probability the calss was detected
-        threshold = .40
+
 
         #retrieve the model output first index correlates to output array
         boxes = interpreter.get_tensor(outputDetails[0]['index'])[0] # Bounding box cordinates                                                                #understand get tensor
@@ -362,6 +378,7 @@ if __name__ == "__main__":
         Give a delay to allow user to adjust before warning the user of any other objects
         *****************************************
         """
+        warn = False
         for i in range(count):                                                                                                                      #check if count is correct.
             if(score[i] >= threshold):
                 #retive the bounding box coordinates. Must make sure that the coordinates are not ouside the image 
@@ -369,27 +386,24 @@ if __name__ == "__main__":
                 xmin = int(max(1, (boxes[i][1] * origW)))
                 ymax = int(min(origH, (boxes[i][2] * origH)))
                 xmax = int(min(origW, (boxes[i][3] * origW)))
-                object_distance(depth_frame, (xmin,ymin), (xmax,ymax), backbone)
-                #print(ymin, xmin, ymax, xmax)
+                #object_distance(depth_frame, (xmin,ymin), (xmax,ymax), backbone)
                 #draws the boundiung box
                 cv2.rectangle(color_image, (xmin,ymin), (xmax,ymax), (10,255,0), 4, cv2.LINE_4)
-
+                
                 #apply the label to each object. check make sure its a valid label.
-                print(classes[i])
-                if(int(classes[i]) < len(label)):
-                    object_name = label[int(classes[i])] # Look up the object in the label array from the class index
-                    label_name =  '%s: %d%%' % (object_name, int(score[i]*100))
+               # if(int(classes[i]) < len(label)):
+                object_name = label[int(classes[i])] # Look up the object in the label array from the class index
 
-                    #labelSize, baseLine = cv2.getTextSize(label_name, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2) # Get font size
-                    #label_ymin = max(ymin, labelSize[1] + 10) # Make sure not to draw label too close to top of window
+                #checks the objects for any concerns
+                if (warn !=True):
+                    object_detect(depth_frame, (xmin,ymin),(xmax,ymax), object_name,  backbone, default_distance = 0.5)
 
-                    #cv2.rectangle(color_image, (xmin, label_ymin-labelSize[1]-10), (xmin+labelSize[0], label_ymin+baseLine-10), (255, 255, 255), cv2.FILLED) # Draw white box to put label text in
-
-                    #cv2.putText(color_image, label_name, (xmin, label_ymin-7), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2) # Draw label text
-                    cv2.putText(color_image, label_name, (xmin, ymin), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,0), 2) 
-
-            
-
+                label_name =  '%s: %d%%' % (object_name, int(score[i]*100))
+                #labelSize, baseLine = cv2.getTextSize(label_name, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2) # Get font size
+                #label_ymin = max(ymin, labelSize[1] + 10) # Make sure not to draw label too close to top of window
+                #cv2.rectangle(color_image, (xmin, label_ymin-labelSize[1]-10), (xmin+labelSize[0], label_ymin+baseLine-10), (255, 255, 255), cv2.FILLED) # Draw white box to put label text in
+                #cv2.putText(color_image, label_name, (xmin, label_ymin-7), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2) # Draw label text
+                cv2.putText(color_image, label_name, (xmin, ymin), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,0), 2) 
 
         #apply all the filters to the depth and converts it to np.array
         depthFrame = backbone.allFilters(depth_frame, 2, 4)
