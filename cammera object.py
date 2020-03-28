@@ -28,8 +28,8 @@ class realsenseBackbone():
         if len(bagfile) == 0:
             config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
             config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
-            #config.enable_stream(rs.stream.accel, rs.format.motion_xyz32f, 250)
-            #config.enable_stream(rs.stream.gyro, rs.format.motion_xyz32f, 200)
+            config.enable_stream(rs.stream.accel)
+            config.enable_stream(rs.stream.gyro)
         else:
             config.enable_device_from_file(bagfile)    #can do ,false to not repeat
         return config
@@ -309,7 +309,7 @@ def object_detect(frame, min, max, object_name, realsense_backbone, default_dist
         warn = object_distance(frame, min, max, realsense_backbone, default_distance)
 
     if (warn):
-        playsound('Buzzer.mp3', False)
+        #playsound('Buzzer.mp3', False)
         time.sleep(2)                                                                                                                                                  #look into how to have it wait to warn about about 
         return True
 
