@@ -28,8 +28,8 @@ class realsenseBackbone():
         if len(bagfile) == 0:
             config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
             config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
-            config.enable_stream(rs.stream.accel)
-            config.enable_stream(rs.stream.gyro)
+            #config.enable_stream(rs.stream.accel)
+            #qconfig.enable_stream(rs.stream.gyro)
         else:
             config.enable_device_from_file(bagfile)    #can do ,false to not repeat
         return config
@@ -396,7 +396,7 @@ if __name__ == "__main__":
 
                 #checks the objects for any concerns
                 if (warn !=True):
-                    object_detect(depth_frame, (xmin,ymin),(xmax,ymax), object_name,  backbone, default_distance = 0.5)
+                    warn = object_detect(depth_frame, (xmin,ymin),(xmax,ymax), object_name,  backbone, default_distance = 0.5)
 
                 label_name =  '%s: %d%%' % (object_name, int(score[i]*100))
                 #labelSize, baseLine = cv2.getTextSize(label_name, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2) # Get font size
